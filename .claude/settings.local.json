@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(node seed.js)",
+      "Bash(node -e \"const dns = require\\('dns'\\); dns.setServers\\(['8.8.8.8','8.8.4.4']\\); dns.resolve4\\('google.com', \\(e,a\\) => console.log\\(e ? 'DNS error: '+e.code : 'DNS works: '+a[0]\\)\\)\")",
+      "Bash(node --check server.js)",
+      "Bash(node --check routes/auth.js)",
+      "Bash(node --check routes/notes.js)",
+      "Bash(node --check routes/mess.js)",
+      "Bash(node --check routes/lostfound.js)",
+      "Bash(node --check middleware/auth.js)",
+      "Bash(node --check models/User.js)",
+      "Bash(node --check models/Note.js)",
+      "Bash(node --check models/MessMenu.js)",
+      "Bash(node --check models/LostFound.js)",
+      "Bash(node --check seed.js)",
+      "Bash(node --check dns-override.js)",
+      "Bash(node -e \"const net = require\\('net'\\); const s = new net.Socket\\(\\); s.setTimeout\\(5000\\); s.connect\\(27017, 'ac-eepang6-shard-00-00.rww1ndp.mongodb.net', \\(\\) => { console.log\\('PORT OPEN'\\); s.destroy\\(\\); }\\); s.on\\('error', e => console.log\\('BLOCKED:', e.message\\)\\); s.on\\('timeout', \\(\\) => console.log\\('TIMEOUT'\\)\\);\")",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"console.log\\('System time:', new Date\\(\\).toISOString\\(\\)\\)\")",
+      "Bash(node server.js)",
+      "Bash(curl -s http://localhost:5000/api/auth/me)"
+    ]
+  }
+}

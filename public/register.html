@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="auth-shell">
+    <section class="auth-brand">
+      <span class="brand-kicker">Student Onboarding</span>
+      <h1>Join College Buddy</h1>
+      <p>Create your student account and access all campus tools in one place.</p>
+      <ul class="auth-feature-list">
+        <li>Upload or buy notes with points</li>
+        <li>Stay updated with class schedules</li>
+        <li>Track attendance subject-wise</li>
+        <li>Report lost and found items</li>
+        <li>Discover and review food places</li>
+      </ul>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-box" style="max-width:560px">
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-subtitle">Register as student to start using your dashboard.</p>
+
+        <div id="alert-box"></div>
+
+        <form id="register-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Full Name *</label>
+              <input type="text" id="name" placeholder="Your full name" required />
+            </div>
+            <div class="form-group">
+              <label>Roll Number</label>
+              <input type="text" id="rollNo" placeholder="e.g. CSE21001" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="email" placeholder="college email" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Password *</label>
+              <input type="password" id="password" placeholder="min 6 chars" required />
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" id="phone" placeholder="10-digit" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Department *</label>
+              <select id="department" required>
+                <option value="">Select</option>
+                <option value="CSE">CSE</option>
+                <option value="ME">ME</option>
+                <option value="ECE">ECE</option>
+                <option value="Civil">Civil</option>
+                <option value="EE">EE</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Year *</label>
+              <select id="year" required>
+                <option value="">Select</option>
+                <option value="1Y">1st Year</option>
+                <option value="2Y">2nd Year</option>
+                <option value="3Y">3rd Year</option>
+                <option value="4Y">4th Year</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" id="dob" />
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="reg-btn">Create Account</button>
+        </form>
+
+        <p class="muted-link" style="text-align:center;margin-top:16px">
+          Already have an account? <a href="/">Sign in</a>
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    redirectIfAuth();
+
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById('reg-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Creating account...';
+
+      try {
+        const data = await apiFetch('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            rollNo: document.getElementById('rollNo').value,
+            phone: document.getElementById('phone').value,
+            department: document.getElementById('department').value,
+            year: document.getElementById('year').value,
+            dob: document.getElementById('dob').value || undefined
+          })
+        });
+
+        saveAuth(data.token, data.user);
+        window.location.href = '/dashboard.html';
+      } catch (err) {
+        showAlert('alert-box', err.message, 'danger');
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    });
+  </script>
+</body>
+</html>

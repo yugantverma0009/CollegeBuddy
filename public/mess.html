@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mess Menu - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+  <div class="topbar">
+    <button id="menu-toggle">☰</button>
+    <h2>Mess Menu</h2>
+  </div>
+
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <h1>Mess Menu</h1>
+          <p>Weekly mess schedule with timings. Current meal is highlighted.</p>
+        </div>
+        <button class="btn btn-primary" id="manage-btn" style="display:none">+ Manage Menu</button>
+      </div>
+
+      <div id="alert-box"></div>
+      <div id="mess-container">
+        <div class="empty-state">
+          <div class="empty-mark"></div>
+          <p>Loading menu...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="manage-modal">
+    <div class="modal" style="max-width:580px">
+      <button class="modal-close" id="close-manage">✕</button>
+      <h3>Set Mess Menu</h3>
+      <div id="manage-alert"></div>
+      <form id="mess-form">
+        <div class="form-group">
+          <label>Day *</label>
+          <select id="mess-day" required>
+            <option value="">Select day</option>
+            <option>Monday</option>
+            <option>Tuesday</option>
+            <option>Wednesday</option>
+            <option>Thursday</option>
+            <option>Friday</option>
+            <option>Saturday</option>
+            <option>Sunday</option>
+          </select>
+        </div>
+
+        <div id="meals-container">
+          <h4 style="margin-bottom:10px">Meals</h4>
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-sm" id="add-meal-btn" style="margin-bottom:16px">+ Add Meal</button>
+        <button type="submit" class="btn btn-primary btn-full">Save Menu</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error();
+    renderSidebar();
+
+    const user = getUser();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = days[new Date().getDay()];
+
+    let menus = [];
+    let mealCount = 0;
+
+    if (['cr', 'admin'].includes(user.role)) {
+      document.getElementById('manage-btn').style.display = 'block';
+    }
+
+    function getCurrentMealStatus(startTime, endTime) {
+      const now = new Date();
+      const cur = now.getHours() * 60 + now.getMinutes();
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      return cur >= start && cur <= end;
+    }
+
+    function to12Hour(time24) {
+      const [hRaw, mRaw] = String(time24).split(':');
+      const h = Number(hRaw);
+      const m = Number(mRaw);
+      if (Number.isNaN(h) || Number.isNaN(m)) return time24;
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+      return `${hour12}:${String(m).padStart(2, '0')} ${suffix}`;
+    }
+
+    async function loadMenus() {
+      try {
+        menus = await apiFetch('/mess');
+        renderMenus();
+      } catch (e) {
+        document.getElementById('mess-container').innerHTML = `<div class="empty-state"><div class="empty-mark"></div><p>Could not load menus. ${e.message}</p></div>`;
+      }
+    }
+
+    function renderMenus() {
+      if (!menus.length) {
+        document.getElementById('mess-container').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-mark"></div>
+            <p>No mess menu added yet. ${['cr', 'admin'].includes(user.role) ? 'Click "Manage Menu" to add.' : 'Ask your CR to add it.'}</p>
+          </div>`;
+        return;
+      }
+
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const todayIdx = dayOrder.indexOf(today);
+      const ordered = [...dayOrder.slice(todayIdx), ...dayOrder.slice(0, todayIdx)];
+
+      let html = '';
+      ordered.forEach((day) => {
+        const menu = menus.find((m) => m.day === day);
+        if (!menu) return;
+
+        const isToday = day === today;
+        html += `<div class="mess-day ${isToday ? 'today' : ''}">
+          <div class="mess-day-header">
+            ${day}
+            ${isToday ? '<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:10px;font-size:0.75rem">Today</span>' : ''}
+            ${menu.updatedBy ? `<span style="float:right;font-size:0.75rem;opacity:0.8">Updated by ${menu.updatedBy.name}</span>` : ''}
+          </div>`;
+
+        if (!menu.meals || !menu.meals.length) {
+          html += `<div class="meal-row"><span style="color:#94a3b8;font-size:0.85rem">No meals added for this day</span></div>`;
+        } else {
+          menu.meals.forEach((meal) => {
+            const active = isToday && getCurrentMealStatus(meal.startTime, meal.endTime);
+            html += `<div class="meal-row ${active ? 'current-meal' : ''}">
+              <span class="meal-name">${meal.name}</span>
+              <span class="meal-time-range">${to12Hour(meal.startTime)} – ${to12Hour(meal.endTime)}</span>
+              <span class="meal-items">${meal.items.join(' | ')}</span>
+              ${active ? '<span class="badge badge-success" style="margin-left:auto">Serving Now</span>' : ''}
+            </div>`;
+          });
+        }
+
+        html += `</div>`;
+      });
+
+      document.getElementById('mess-container').innerHTML =
+        html || '<div class="empty-state"><div class="empty-mark"></div><p>No menu data</p></div>';
+    }
+
+    document.getElementById('manage-btn').addEventListener('click', () => {
+      document.getElementById('meals-container').innerHTML = '<h4 style="margin-bottom:10px">Meals</h4>';
+      mealCount = 0;
+      addMealRow();
+      addMealRow();
+      addMealRow();
+      addMealRow();
+      document.getElementById('manage-modal').classList.add('show');
+    });
+
+    document.getElementById('close-manage').addEventListener('click', () => {
+      document.getElementById('manage-modal').classList.remove('show');
+    });
+
+    function addMealRow() {
+      const idx = mealCount++;
+      const defaults = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
+      const times = [['08:00', '09:30'], ['12:30', '14:00'], ['17:00', '18:00'], ['20:00', '21:30']];
+
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.style.marginBottom = '10px';
+      div.innerHTML = `
+        <div class="form-row" style="margin-bottom:8px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Meal Name</label>
+            <input type="text" class="meal-name-input" value="${defaults[idx] || ''}" placeholder="e.g. Breakfast"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Start – End</label>
+            <div style="display:flex;gap:6px">
+              <input type="time" class="meal-start" value="${times[idx]?.[0] || ''}"/>
+              <input type="time" class="meal-end" value="${times[idx]?.[1] || ''}"/>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Food Items (comma separated)</label>
+          <input type="text" class="meal-items" placeholder="Idli, Sambar, Coconut Chutney"/>
+        </div>`;
+
+      document.getElementById('meals-container').appendChild(div);
+    }
+
+    document.getElementById('add-meal-btn').addEventListener('click', addMealRow);
+
+    document.getElementById('mess-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const day = document.getElementById('mess-day').value;
+      if (!day) {
+        showAlert('manage-alert', 'Please select a day', 'danger');
+        return;
+      }
+
+      const meals = [];
+      const rows = document.querySelectorAll('#meals-container .card');
+      rows.forEach((row) => {
+        const name = row.querySelector('.meal-name-input').value.trim();
+        const start = row.querySelector('.meal-start').value;
+        const end = row.querySelector('.meal-end').value;
+        const items = row.querySelector('.meal-items').value.split(',').map((s) => s.trim()).filter(Boolean);
+
+        if (name && start && end && items.length) {
+          meals.push({ name, startTime: start, endTime: end, items });
+        }
+      });
+
+      try {
+        await apiFetch('/mess', { method: 'POST', body: JSON.stringify({ day, meals }) });
+        showAlert('manage-alert', `Menu for ${day} saved!`, 'success');
+        await loadMenus();
+      } catch (e) {
+        showAlert('manage-alert', e.message, 'danger');
+      }
+    });
+
+    loadMenus();
+    setInterval(renderMenus, 60000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dining Places - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+  <div class="topbar">
+    <button id="menu-toggle">☰</button>
+    <h2>Dining Places</h2>
+  </div>
+
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <h1>Famous Dining Places</h1>
+          <p>Discover food joints near campus. Earn 10 points for adding a place!</p>
+        </div>
+        <button class="btn btn-primary" id="add-place-btn">+ Add Place</button>
+      </div>
+
+      <div id="alert-box"></div>
+      <div class="grid-3" id="dining-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-mark"></div>
+          <p>Loading places...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="add-modal">
+    <div class="modal">
+      <button class="modal-close" id="close-add">✕</button>
+      <h3>Add Dining Place</h3>
+      <p style="font-size:0.82rem;color:#64748b;margin-bottom:16px">You earn 10 points for every place you add!</p>
+      <div id="add-alert"></div>
+      <form id="add-form" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>Place Name *</label>
+          <input type="text" id="d-name" placeholder="e.g. Raj Dhaba" required/>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="d-desc" rows="3" placeholder="What's special here? Cheap? Good taste?"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Google Maps Link</label>
+          <input type="url" id="d-map" placeholder="Paste Google Maps URL"/>
+        </div>
+        <div class="form-group">
+          <label>Photo</label>
+          <input type="file" id="d-photo" accept=".jpg,.jpeg,.png,.webp"/>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="add-submit">Add Place</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:600px">
+      <button class="modal-close" id="close-detail">✕</button>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error();
+    renderSidebar();
+
+    const user = getUser();
+    let places = [];
+    let selectedStar = 0;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function closeDiningModals() {
+      document.getElementById('add-modal').classList.remove('show');
+      document.getElementById('detail-modal').classList.remove('show');
+    }
+
+    function resetReviewState() {
+      selectedStar = 0;
+    }
+
+    function hasUserReviewed(place) {
+      return (place.reviews || []).some((review) => {
+        const reviewUserId = review?.user?._id || review?.user;
+        return String(reviewUserId) === String(user._id);
+      });
+    }
+
+    async function loadPlaces() {
+      try {
+        places = await apiFetch('/dining');
+        renderPlaces();
+      } catch (e) {
+        document.getElementById('dining-grid').innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-mark"></div>
+            <p>${escapeHtml(e.message)}</p>
+          </div>`;
+      }
+    }
+
+    function renderPlaces() {
+      const grid = document.getElementById('dining-grid');
+      if (!places.length) {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-mark"></div>
+            <p>No places added yet. Be the first to add one and earn 10 points!</p>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = places.map((place) => `
+        <div class="dining-card" onclick="openPlace('${place._id}')">
+          ${place.photo
+            ? `<img src="${place.photo}" alt="${escapeHtml(place.name)}" onerror="this.style.display='none'"/>`
+            : `<div style="height:180px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:3rem"></div>`}
+          <div class="dining-card-body">
+            <h4 style="margin-bottom:6px;font-size:0.95rem">${escapeHtml(place.name)}</h4>
+            <div style="margin-bottom:8px">
+              ${starsHtml(place.avgRating)}
+              <span style="font-size:0.8rem;color:#64748b">
+                ${place.avgRating > 0 ? `${place.avgRating} / 5` : 'No ratings'} (${place.reviews?.length || 0} reviews)
+              </span>
+            </div>
+            <p style="font-size:0.82rem;color:#64748b;margin-bottom:8px">
+              ${place.description ? escapeHtml(place.description.slice(0, 80) + (place.description.length > 80 ? '...' : '')) : 'No description'}
+            </p>
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8">
+              <span>by ${escapeHtml(place.uploadedBy?.name || 'Unknown')}</span>
+              <span>${place.comments?.length || 0}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getReviewComposer(placeId, userReviewed) {
+      if (userReviewed) {
+        return `
+          <div class="card" style="margin-bottom:16px;background:rgba(22,163,74,0.08);border-color:rgba(22,163,74,0.18)">
+            <p style="font-size:0.85rem;color:#16a34a;font-weight:700">You already reviewed this place</p>
+          </div>`;
+      }
+
+      return `
+        <div class="card" style="margin-bottom:16px">
+          <h4 style="font-size:0.9rem;margin-bottom:10px">Rate This Place (+3 pts)</h4>
+          <div style="display:flex;gap:10px;margin-bottom:10px" id="star-picker">
+            ${[1, 2, 3, 4, 5].map((i) => `
+              <button
+                type="button"
+                class="star-btn"
+                data-val="${i}"
+                onclick="selectStar(${i})"
+                style="font-size:1.5rem;background:none;border:none;cursor:pointer;opacity:0.35"
+              >★</button>
+            `).join('')}
+          </div>
+          <textarea
+            id="review-text"
+            rows="2"
+            placeholder="Write a review..."
+            style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.85rem;margin-bottom:8px"
+          ></textarea>
+          <button class="btn btn-warning btn-sm" onclick="submitReview('${placeId}')">Submit Review</button>
+        </div>`;
+    }
+
+    function openPlace(id) {
+      const place = places.find((item) => item._id === id);
+      if (!place) return;
+
+      closeDiningModals();
+      resetReviewState();
+
+      const userReviewed = hasUserReviewed(place);
+      const isOwner = String(place.uploadedBy?._id || place.uploadedBy) === String(user._id);
+      const reviews = (place.reviews || []).map((review) => `
+        <div style="padding:8px 0;border-bottom:1px solid #f1f5f9">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="width:28px;height:28px;border-radius:50%;background:#2563eb;color:white;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700">
+              ${escapeHtml(getInitials(review.user?.name || 'U'))}
+            </div>
+            <strong style="font-size:0.85rem">${escapeHtml(review.user?.name || 'Unknown')}</strong>
+            ${starsHtml(review.rating)}
+            <span style="font-size:0.72rem;color:#94a3b8;margin-left:auto">${timeSince(review.createdAt)}</span>
+          </div>
+          <p style="font-size:0.82rem;color:#64748b;padding-left:36px">${escapeHtml(review.text || '')}</p>
+        </div>
+      `).join('');
+
+      const comments = (place.comments || []).map((comment) => `
+        <div class="comment">
+          <div class="comment-avatar">${escapeHtml(getInitials(comment.user?.name || 'U'))}</div>
+          <div class="comment-body">
+            <p class="author">${escapeHtml(comment.user?.name || 'Unknown')}</p>
+            <p class="text">${escapeHtml(comment.text || '')}</p>
+            <p class="time">${timeSince(comment.createdAt)}</p>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('detail-content').innerHTML = `
+        ${place.photo
+          ? `<img src="${place.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-bottom:16px" onerror="this.style.display='none'"/>`
+          : ''}
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <h3>${escapeHtml(place.name)}</h3>
+          ${isOwner ? `<button onclick="deletePlace('${id}')" class="btn btn-danger btn-sm">Delete</button>` : ''}
+        </div>
+        <div style="margin-bottom:12px">
+          ${starsHtml(place.avgRating)}
+          <strong>${place.avgRating || 0}/5</strong>
+          <span style="font-size:0.8rem;color:#64748b;margin-left:8px">(${place.reviews?.length || 0} reviews)</span>
+        </div>
+        ${place.description ? `<p style="font-size:0.88rem;color:#64748b;margin-bottom:12px">${escapeHtml(place.description)}</p>` : ''}
+        ${place.mapLink ? `<a href="${place.mapLink}" target="_blank" class="btn btn-secondary btn-sm" style="margin-bottom:16px">View on Map</a>` : ''}
+        <div id="detail-alert"></div>
+        ${getReviewComposer(id, userReviewed)}
+        <h4 style="margin-bottom:10px">Reviews</h4>
+        <div style="margin-bottom:16px">${reviews || '<p style="color:#94a3b8;font-size:0.85rem">No reviews yet</p>'}</div>
+        <h4 style="margin-bottom:10px">Comments</h4>
+        <div style="margin-bottom:12px">${comments || '<p style="color:#94a3b8;font-size:0.85rem">No comments</p>'}</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="d-comment-in" placeholder="Add a comment..." style="flex:1;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.88rem"/>
+          <button class="btn btn-primary btn-sm" onclick="addDiningComment('${id}')">Post</button>
+        </div>`;
+
+      document.getElementById('detail-modal').classList.add('show');
+    }
+
+    function selectStar(value) {
+      selectedStar = value;
+      document.querySelectorAll('.star-btn').forEach((btn, index) => {
+        btn.style.opacity = index < value ? '1' : '0.35';
+      });
+    }
+
+    async function submitReview(id) {
+      if (!selectedStar) {
+        alert('Please select a star rating');
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`/dining/${id}/review`, {
+          method: 'POST',
+          body: JSON.stringify({
+            rating: selectedStar,
+            text: document.getElementById('review-text')?.value || ''
+          })
+        });
+
+        resetReviewState();
+        await loadPlaces();
+        openPlace(id);
+        showAlert('detail-alert', `Review submitted! New avg: ${res.avgRating}/5`, 'success');
+      } catch (e) {
+        showAlert('detail-alert', e.message, 'danger');
+      }
+    }
+
+    async function addDiningComment(id) {
+      const input = document.getElementById('d-comment-in');
+      const text = input?.value.trim();
+      if (!text) return;
+
+      try {
+        await apiFetch(`/dining/${id}/comment`, {
+          method: 'POST',
+          body: JSON.stringify({ text })
+        });
+        await loadPlaces();
+        openPlace(id);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function deletePlace(id) {
+      if (!confirm('Delete this place?')) return;
+
+      try {
+        await apiFetch(`/dining/${id}`, { method: 'DELETE' });
+        closeDiningModals();
+        await loadPlaces();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    document.getElementById('add-place-btn').addEventListener('click', () => {
+      resetReviewState();
+      document.getElementById('detail-modal').classList.remove('show');
+      document.getElementById('add-modal').classList.add('show');
+    });
+
+    document.getElementById('close-add').addEventListener('click', () => {
+      document.getElementById('add-modal').classList.remove('show');
+    });
+
+    document.getElementById('close-detail').addEventListener('click', () => {
+      document.getElementById('detail-modal').classList.remove('show');
+      resetReviewState();
+    });
+
+    document.getElementById('add-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('add-submit');
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+
+      const fd = new FormData();
+      fd.append('name', document.getElementById('d-name').value);
+      fd.append('description', document.getElementById('d-desc').value);
+      fd.append('mapLink', document.getElementById('d-map').value);
+
+      const photo = document.getElementById('d-photo').files[0];
+      if (photo) fd.append('photo', photo);
+
+      try {
+        await apiFetch('/dining', { method: 'POST', body: fd, headers: {} });
+        showAlert('add-alert', 'Place added! You earned 10 points', 'success');
+        document.getElementById('add-form').reset();
+        await loadPlaces();
+        document.getElementById('add-modal').classList.remove('show');
+      } catch (e) {
+        showAlert('add-alert', e.message, 'danger');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Add Place';
+    });
+
+    loadPlaces();
+  </script>
+</body>
+</html>

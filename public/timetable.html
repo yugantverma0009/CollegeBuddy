@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Timetable - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+  <div class="topbar">
+    <button id="menu-toggle">☰</button>
+    <h2>Timetable</h2>
+  </div>
+
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <h1>Class Timetable</h1>
+          <p>Weekly schedule. Teachers can cancel classes, and CRs can edit the timetable.</p>
+        </div>
+        <div class="tt-actions">
+          <button class="btn tt-action-btn tt-action-muted" id="cancel-btn" style="display:none">Cancel Class</button>
+          <button class="btn tt-action-btn tt-action-primary" id="edit-tt-btn" style="display:none">Edit Timetable</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <select id="tt-dept">
+          <option value="">My Department</option>
+          <option value="CSE">CSE</option>
+          <option value="ME">ME</option>
+          <option value="ECE">ECE</option>
+          <option value="Civil">Civil</option>
+          <option value="EE">EE</option>
+        </select>
+        <select id="tt-year">
+          <option value="">My Year</option>
+          <option value="1Y">1Y</option>
+          <option value="2Y">2Y</option>
+          <option value="3Y">3Y</option>
+          <option value="4Y">4Y</option>
+        </select>
+        <button class="btn btn-secondary" id="load-tt-btn">Load</button>
+      </div>
+
+      <div id="alert-box"></div>
+      <div class="tt-summary" id="tt-summary">
+        <div class="stat-card">
+          <div class="stat-label">Today</div>
+          <div class="stat-value" id="summary-today">-</div>
+          <div class="tt-summary-sub" id="summary-today-sub">Loading...</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next Class</div>
+          <div class="stat-value" id="summary-next">-</div>
+          <div class="tt-summary-sub" id="summary-next-sub">Checking schedule...</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Latest Update</div>
+          <div class="stat-value" id="summary-update">-</div>
+          <div class="tt-summary-sub" id="summary-update-sub">Waiting for timetable...</div>
+        </div>
+      </div>
+      <div id="tt-container">
+        <div class="empty-state">
+          <div class="empty-mark"></div>
+          <p>Loading timetable...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal" style="max-width:760px">
+      <button class="modal-close" id="close-edit">✕</button>
+      <h3>Edit Timetable</h3>
+      <div id="edit-alert"></div>
+      <form id="tt-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Department</label>
+            <select id="edit-dept">
+              <option value="CSE">CSE</option>
+              <option value="ME">ME</option>
+              <option value="ECE">ECE</option>
+              <option value="Civil">Civil</option>
+              <option value="EE">EE</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Year</label>
+            <select id="edit-year">
+              <option value="1Y">1Y</option>
+              <option value="2Y">2Y</option>
+              <option value="3Y">3Y</option>
+              <option value="4Y">4Y</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="days-container"></div>
+        <button type="submit" class="btn btn-primary btn-full">Save Timetable</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cancel-modal">
+    <div class="modal">
+      <button class="modal-close" id="close-cancel">✕</button>
+      <h3>Cancel / Reschedule Class</h3>
+      <div id="cancel-alert"></div>
+      <div class="form-group">
+        <label>Day</label>
+        <select id="c-day">
+          <option>Monday</option>
+          <option>Tuesday</option>
+          <option>Wednesday</option>
+          <option>Thursday</option>
+          <option>Friday</option>
+          <option>Saturday</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Period Time (e.g. 09:00 - 10:00)</label>
+        <select id="c-period">
+          <option value="">Select a class</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Action</label>
+        <select id="c-status">
+          <option value="cancelled">Cancel Class</option>
+          <option value="rescheduled">Reschedule</option>
+          <option value="normal">Restore Normal</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note (optional)</label>
+        <input type="text" id="c-note" placeholder="Reason or rescheduled time..."/>
+      </div>
+      <button class="btn btn-warning btn-full" id="do-cancel">Update Period</button>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error();
+    renderSidebar();
+
+    const user = getUser();
+    let currentDept = user.department;
+    let currentYear = user.year;
+    let currentTimetable = null;
+
+    if (['cr', 'admin'].includes(user.role)) {
+      document.getElementById('edit-tt-btn').style.display = 'inline-flex';
+      document.getElementById('cancel-btn').style.display = 'inline-flex';
+    } else if (user.role === 'teacher') {
+      document.getElementById('cancel-btn').style.display = 'inline-flex';
+    }
+
+    async function loadTT(dept, year) {
+      currentDept = dept;
+      currentYear = year;
+      try {
+        const tt = await apiFetch(`/timetable/${dept}/${year}`);
+        currentTimetable = tt;
+        renderTT(tt);
+        syncCancelPeriodOptions();
+      } catch (e) {
+        currentTimetable = null;
+        renderSummary(null);
+        const msg = e.message.includes('No timetable') ? 'No timetable set up for this class yet.' : e.message;
+        document.getElementById('tt-container').innerHTML = `<div class="empty-state"><div class="empty-mark"></div><p>${msg}</p></div>`;
+      }
+    }
+
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()];
+
+    function formatGroup(group) {
+      if (!group || group === 'ALL') return '';
+      return `<span class="badge badge-info" style="margin-left:8px;font-size:0.68rem">${group}</span>`;
+    }
+
+    function escapeAttr(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function toMinutes(range) {
+      const start = range.split('-')[0]?.trim();
+      if (!start) return Number.MAX_SAFE_INTEGER;
+      const [h, m] = start.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return Number.MAX_SAFE_INTEGER;
+      return h * 60 + m;
+    }
+
+    function formatTimeRange(range) {
+      const [start, end] = range.split('-').map((part) => part.trim());
+      if (!start || !end) return range;
+
+      const formatPart = (value) => {
+        const [hour, minute] = value.split(':').map(Number);
+        if (Number.isNaN(hour) || Number.isNaN(minute)) return value;
+        const suffix = hour >= 12 ? 'PM' : 'AM';
+        const normalizedHour = hour % 12 || 12;
+        return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+      };
+
+      return `${formatPart(start)} - ${formatPart(end)}`;
+    }
+
+    function getTodayPeriods(tt) {
+      const today = tt?.schedule?.find((day) => day.day === todayName);
+      return today?.periods ? [...today.periods].sort((a, b) => toMinutes(a.time) - toMinutes(b.time)) : [];
+    }
+
+    function getUpcomingPeriod(periods) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      return periods.find((period) => period.status !== 'cancelled' && toMinutes(period.time) >= currentMinutes) || null;
+    }
+
+    function renderSummary(tt) {
+      const todayPeriods = getTodayPeriods(tt);
+      const activeCount = todayPeriods.filter((period) => period.status !== 'cancelled').length;
+      const changedCount = todayPeriods.filter((period) => period.status !== 'normal').length;
+      const nextPeriod = getUpcomingPeriod(todayPeriods);
+
+      document.getElementById('summary-today').textContent = todayPeriods.length ? `${activeCount}/${todayPeriods.length}` : 'Free';
+      document.getElementById('summary-today-sub').textContent = todayPeriods.length
+        ? `${changedCount} updated class${changedCount === 1 ? '' : 'es'} today`
+        : 'No classes scheduled today';
+
+      document.getElementById('summary-next').textContent = nextPeriod ? nextPeriod.subject : 'None';
+      document.getElementById('summary-next-sub').textContent = nextPeriod
+        ? `${formatTimeRange(nextPeriod.time)}${nextPeriod.room ? ` • ${nextPeriod.room}` : ''}`
+        : (todayPeriods.length ? 'No more classes today' : 'Enjoy the break');
+
+      document.getElementById('summary-update').textContent = tt?.updatedAt ? timeSince(tt.updatedAt) : '-';
+      document.getElementById('summary-update-sub').textContent = tt?.updatedAt
+        ? `${tt.updatedBy?.name || 'Someone'} updated on ${formatDate(tt.updatedAt)}`
+        : 'No timetable loaded';
+    }
+
+    function getStatusBadge(period) {
+      if (period.status === 'cancelled') {
+        return `<span class="badge badge-danger">Cancelled${period.note ? `: ${period.note}` : ''}</span>`;
+      }
+
+      if (period.status === 'rescheduled') {
+        return `<span class="badge badge-warning">Rescheduled${period.note ? `: ${period.note}` : ''}</span>`;
+      }
+
+      return '';
+    }
+
+    function renderTT(tt) {
+      renderSummary(tt);
+
+      if (!tt.schedule || !tt.schedule.length) {
+        document.getElementById('tt-container').innerHTML = `<div class="empty-state"><div class="empty-mark"></div><p>Timetable is empty</p></div>`;
+        return;
+      }
+
+      let html = `<p style="font-size:0.82rem;color:#94a3b8;margin-bottom:16px">Last updated by ${tt.updatedBy ? tt.updatedBy.name : 'N/A'} on ${tt.updatedAt ? formatDate(tt.updatedAt) : 'N/A'}</p>`;
+      const orderedSchedule = dayOrder.map((d) => tt.schedule.find((s) => s.day === d)).filter(Boolean);
+
+      orderedSchedule.forEach((day) => {
+        const isToday = day.day === todayName;
+        const orderedPeriods = [...day.periods].sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
+        html += `<div class="tt-day"><h4>${day.day} ${isToday ? '<span style="font-size:0.72rem;font-weight:500;color:#2563eb">(Today)</span>' : ''}</h4>`;
+
+        if (!orderedPeriods.length) {
+          html += `<p style="padding:8px 14px;font-size:0.85rem;color:#94a3b8">No classes</p>`;
+        } else {
+          orderedPeriods.forEach((p) => {
+            const group = p.group || 'ALL';
+            const isNext = isToday && currentTimetable && getUpcomingPeriod(getTodayPeriods(currentTimetable)) === p;
+            html += `<div class="period-row ${p.status !== 'normal' ? p.status : ''}">
+              <span class="period-time">${formatTimeRange(p.time)}</span>
+              <span class="period-subject">${p.subject}${formatGroup(group)}</span>
+              <span style="font-size:0.8rem;color:#64748b">${p.teacherName || ''}${group !== 'ALL' ? ` (${group})` : ''} ${p.room ? '• ' + p.room : ''}</span>
+              ${isNext ? '<span class="badge badge-success">Next</span>' : ''}
+              ${getStatusBadge(p)}
+            </div>`;
+          });
+        }
+
+        html += `</div>`;
+      });
+
+      document.getElementById('tt-container').innerHTML = html;
+    }
+
+    function buildEditForm() {
+      const container = document.getElementById('days-container');
+      container.innerHTML = '';
+      const existingDays = Object.fromEntries((currentTimetable?.schedule || []).map((day) => [day.day, day]));
+
+      dayOrder.slice(0, 6).forEach((day) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.marginBottom = '12px';
+        div.dataset.day = day;
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h4 style="font-size:0.9rem">${day}</h4>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addPeriod(this,'${day}')">+ Period</button>
+          </div>
+          <div class="periods-list-${day}"></div>`;
+        container.appendChild(div);
+
+        const periods = [...(existingDays[day]?.periods || [])].sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
+        periods.forEach((period) => addPeriod(null, day, period));
+      });
+    }
+
+    function addPeriod(_btn, day, period = {}) {
+      const list = document.querySelector(`.periods-list-${day}`);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap';
+      row.innerHTML = `
+        <input type="text" class="p-time" placeholder="09:00 - 10:00" value="${escapeAttr(period.time)}" style="width:130px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.82rem"/>
+        <input type="text" class="p-subj" placeholder="Subject" value="${escapeAttr(period.subject)}" style="width:140px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.82rem"/>
+        <input type="text" class="p-teacher" placeholder="Teacher name" value="${escapeAttr(period.teacherName)}" style="width:130px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.82rem"/>
+        <select class="p-group" style="width:80px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.82rem">
+          <option value="ALL">All</option>
+          <option value="G1">G1</option>
+          <option value="G2">G2</option>
+        </select>
+        <input type="text" class="p-room" placeholder="Room" value="${escapeAttr(period.room)}" style="width:80px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.82rem"/>
+        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:1rem">✕</button>`;
+      list.appendChild(row);
+      row.querySelector('.p-group').value = period.group || 'ALL';
+    }
+
+    function syncCancelPeriodOptions() {
+      const day = document.getElementById('c-day').value;
+      const periodSelect = document.getElementById('c-period');
+      const periods = currentTimetable?.schedule?.find((item) => item.day === day)?.periods || [];
+      const orderedPeriods = [...periods].sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
+
+      periodSelect.innerHTML = '<option value="">Select a class</option>';
+
+      orderedPeriods.forEach((period) => {
+        const option = document.createElement('option');
+        option.value = JSON.stringify({
+          time: period.time,
+          subject: period.subject,
+          group: period.group || 'ALL'
+        });
+        option.textContent = `${formatTimeRange(period.time)} • ${period.subject}${period.group && period.group !== 'ALL' ? ` (${period.group})` : ''}`;
+        periodSelect.appendChild(option);
+      });
+    }
+
+    function updateCancelNotePlaceholder() {
+      const status = document.getElementById('c-status').value;
+      const input = document.getElementById('c-note');
+      input.placeholder = status === 'rescheduled'
+        ? 'New time or room...'
+        : status === 'normal'
+          ? 'Optional restore note'
+          : 'Reason for cancellation...';
+    }
+
+    document.getElementById('edit-tt-btn').addEventListener('click', () => {
+      buildEditForm();
+      document.getElementById('edit-dept').value = currentDept;
+      document.getElementById('edit-year').value = currentYear;
+      document.getElementById('edit-modal').classList.add('show');
+    });
+
+    document.getElementById('close-edit').addEventListener('click', () => {
+      document.getElementById('edit-modal').classList.remove('show');
+    });
+
+    document.getElementById('tt-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const dept = document.getElementById('edit-dept').value;
+      const year = document.getElementById('edit-year').value;
+
+      const schedule = [];
+      dayOrder.slice(0, 6).forEach((day) => {
+        const periods = [];
+        const rows = document.querySelectorAll(`.periods-list-${day} > div`);
+
+        rows.forEach((row) => {
+          const time = row.querySelector('.p-time')?.value.trim();
+          const subject = row.querySelector('.p-subj')?.value.trim();
+          const teacherName = row.querySelector('.p-teacher')?.value.trim();
+          const group = row.querySelector('.p-group')?.value || 'ALL';
+          const room = row.querySelector('.p-room')?.value.trim();
+
+          if (time && subject) {
+            periods.push({ time, subject, teacherName, group, room, status: 'normal' });
+          }
+        });
+
+        schedule.push({ day, periods });
+      });
+
+      try {
+        await apiFetch('/timetable', {
+          method: 'POST',
+          body: JSON.stringify({ department: dept, year, schedule })
+        });
+        showAlert('edit-alert', 'Timetable saved!', 'success');
+        loadTT(dept, year);
+      } catch (e) {
+        showAlert('edit-alert', e.message, 'danger');
+      }
+    });
+
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      syncCancelPeriodOptions();
+      updateCancelNotePlaceholder();
+      document.getElementById('cancel-modal').classList.add('show');
+    });
+
+    document.getElementById('close-cancel').addEventListener('click', () => {
+      document.getElementById('cancel-modal').classList.remove('show');
+    });
+
+    document.getElementById('do-cancel').addEventListener('click', async () => {
+      try {
+        const selectedPeriod = document.getElementById('c-period').value;
+        if (!selectedPeriod) {
+          showAlert('cancel-alert', 'Select a class first', 'danger');
+          return;
+        }
+
+        const parsedPeriod = JSON.parse(selectedPeriod);
+        await apiFetch('/timetable/period/update', {
+          method: 'PUT',
+          body: JSON.stringify({
+            department: currentDept,
+            year: currentYear,
+            day: document.getElementById('c-day').value,
+            time: parsedPeriod.time,
+            subject: parsedPeriod.subject,
+            group: parsedPeriod.group,
+            status: document.getElementById('c-status').value,
+            note: document.getElementById('c-note').value
+          })
+        });
+        showAlert('cancel-alert', 'Period updated!', 'success');
+        loadTT(currentDept, currentYear);
+      } catch (e) {
+        showAlert('cancel-alert', e.message, 'danger');
+      }
+    });
+
+    document.getElementById('load-tt-btn').addEventListener('click', () => {
+      const dept = document.getElementById('tt-dept').value || user.department;
+      const year = document.getElementById('tt-year').value || user.year;
+      loadTT(dept, year);
+    });
+
+    document.getElementById('c-day').addEventListener('change', syncCancelPeriodOptions);
+    document.getElementById('c-status').addEventListener('change', updateCancelNotePlaceholder);
+
+    loadTT(user.department, user.year);
+  </script>
+</body>
+</html>

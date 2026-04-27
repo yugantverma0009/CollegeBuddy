@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <button id="menu-toggle">☰</button>
+    <h2>College Buddy</h2>
+    <span id="topbar-points" class="points-badge">0 pts</span>
+  </div>
+
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+      <section class="dashboard-hero">
+        <div class="dashboard-hero-head">
+          <div>
+            <h1 id="welcome-msg">Good morning!</h1>
+            <p id="welcome-sub">Here is what is happening today</p>
+          </div>
+          <div class="dashboard-date-chip" id="today-chip">Today</div>
+        </div>
+      </section>
+
+      <div class="grid-4" id="stats-row" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">🏆</div>
+          <div class="stat-value" id="stat-points">0</div>
+          <div class="stat-label">My Points</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">📚</div>
+          <div class="stat-value" id="stat-notes">-</div>
+          <div class="stat-label">Notes Available</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">🔎</div>
+          <div class="stat-value" id="stat-lf">-</div>
+          <div class="stat-label">Lost &amp; Found Active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">📊</div>
+          <div class="stat-value" id="stat-polls">-</div>
+          <div class="stat-label">Active Polls</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Today's Mess Menu</h3>
+          <div id="today-mess" class="stack-list">
+            <p class="muted-link">Loading...</p>
+          </div>
+          <a href="/mess.html" class="section-link">View full week →</a>
+        </div>
+
+        <div class="card">
+          <h3>Today's Classes</h3>
+          <div id="today-tt" class="stack-list">
+            <p class="muted-link">Loading...</p>
+          </div>
+          <a href="/timetable.html" class="section-link">View full timetable →</a>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Recent Notes</h3>
+          <div id="recent-notes" class="stack-list">
+            <p class="muted-link">Loading...</p>
+          </div>
+          <a href="/notes.html" class="section-link">Browse all notes →</a>
+        </div>
+
+        <div class="card">
+          <h3>Active Polls</h3>
+          <div id="active-polls" class="stack-list">
+            <p class="muted-link">Loading...</p>
+          </div>
+          <a href="/polls.html" class="section-link">View all polls →</a>
+        </div>
+      </div>
+
+      <div class="grid-4 quick-grid">
+        <a href="/attendance.html" class="quick-tile">
+          <div class="card">
+            <p><span class="quick-emoji" aria-hidden="true">🧾</span>Attendance</p>
+            <p>Track your 75% target</p>
+          </div>
+        </a>
+        <a href="/lostfound.html" class="quick-tile">
+          <div class="card">
+            <p><span class="quick-emoji" aria-hidden="true">🧳</span>Lost &amp; Found</p>
+            <p>Post and recover items</p>
+          </div>
+        </a>
+        <a href="/dining.html" class="quick-tile">
+          <div class="card">
+            <p><span class="quick-emoji" aria-hidden="true">🍽️</span>Dining Places</p>
+            <p>Rate and discover nearby spots</p>
+          </div>
+        </a>
+        <a href="/students.html" class="quick-tile">
+          <div class="card">
+            <p><span class="quick-emoji" aria-hidden="true">👥</span>Directory</p>
+            <p>Find classmates and faculty</p>
+          </div>
+        </a>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('redirect');
+    renderSidebar();
+
+    const user = getUser();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = days[new Date().getDay()];
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const fullDate = new Date().toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    document.getElementById('welcome-msg').textContent = `${greeting}, ${user.name.split(' ')[0]}!`;
+    document.getElementById('welcome-sub').textContent = `${todayName} • ${fullDate}`;
+    document.getElementById('today-chip').textContent = `${todayName}, ${fullDate}`;
+    document.getElementById('stat-points').textContent = user.points || 0;
+
+    if (document.getElementById('topbar-points')) {
+      document.getElementById('topbar-points').textContent = `${user.points || 0} pts`;
+    }
+
+    function to12Hour(time24) {
+      const [hRaw, mRaw] = String(time24).split(':');
+      const h = Number(hRaw);
+      const m = Number(mRaw);
+      if (Number.isNaN(h) || Number.isNaN(m)) return time24;
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+      return `${hour12}:${String(m).padStart(2, '0')} ${suffix}`;
+    }
+
+    async function loadTodayMess() {
+      try {
+        const menu = await apiFetch('/mess/today');
+        let html = '';
+        const now = new Date();
+
+        menu.meals.forEach((meal) => {
+          const [sh, sm] = meal.startTime.split(':').map(Number);
+          const [eh, em] = meal.endTime.split(':').map(Number);
+          const start = sh * 60 + sm;
+          const end = eh * 60 + em;
+          const cur = now.getHours() * 60 + now.getMinutes();
+          const active = cur >= start && cur <= end;
+
+          html += `<div class="meal-row ${active ? 'current-meal' : ''}">
+            <span class="meal-name">${meal.name}</span>
+            <span class="meal-time-range">${to12Hour(meal.startTime)} - ${to12Hour(meal.endTime)}</span>
+            <span class="meal-items">${meal.items.join(', ')}</span>
+            ${active ? '<span class="badge badge-success" style="margin-left:auto">Now</span>' : ''}
+          </div>`;
+        });
+
+        document.getElementById('today-mess').innerHTML =
+          html || '<p class="muted-link">No menu added for today</p>';
+      } catch {
+        document.getElementById('today-mess').innerHTML = '<p class="muted-link">No mess menu for today</p>';
+      }
+    }
+
+    async function loadTodayTT() {
+      try {
+        const tt = await apiFetch(`/timetable/${user.department}/${user.year}`);
+        const dayData = tt.schedule.find((d) => d.day === todayName);
+
+        if (!dayData || !dayData.periods.length) {
+          document.getElementById('today-tt').innerHTML = '<p class="muted-link">No classes today</p>';
+          return;
+        }
+
+        let html = '';
+        dayData.periods.slice(0, 4).forEach((p) => {
+          html += `<div class="period-row ${p.status !== 'normal' ? p.status : ''}">
+            <span class="period-time">${p.time}</span>
+            <span class="period-subject">${p.subject}</span>
+            ${p.status !== 'normal' ? `<span class="badge badge-danger">${p.status}</span>` : ''}
+          </div>`;
+        });
+
+        document.getElementById('today-tt').innerHTML = html;
+      } catch {
+        document.getElementById('today-tt').innerHTML = '<p class="muted-link">No timetable set up</p>';
+      }
+    }
+
+    async function loadRecentNotes() {
+      try {
+        const notes = await apiFetch(`/notes?department=${user.department}&year=${user.year}`);
+        if (!notes.length) {
+          document.getElementById('recent-notes').innerHTML = '<p class="muted-link">No notes yet</p>';
+          return;
+        }
+
+        let html = '';
+        notes.slice(0, 3).forEach((n) => {
+          html += `<div class="list-item">
+            <p class="list-item-title">${n.title}</p>
+            <p class="list-item-sub">${n.subject} • ${n.uploadedBy?.name || 'Unknown'} ${n.price > 0 ? `• ${n.price} pts` : '• Free'}</p>
+          </div>`;
+        });
+
+        document.getElementById('recent-notes').innerHTML = html;
+      } catch {
+        document.getElementById('recent-notes').innerHTML = '<p class="muted-link">Could not load notes</p>';
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const [notes, lf, polls] = await Promise.all([
+          apiFetch(`/notes?department=${user.department}`),
+          apiFetch('/lostfound'),
+          apiFetch(`/polls?department=${user.department}&year=${user.year}`)
+        ]);
+
+        document.getElementById('stat-notes').textContent = notes.length;
+        document.getElementById('stat-lf').textContent = lf.length;
+        document.getElementById('stat-polls').textContent = polls.filter((p) => p.status === 'active').length;
+
+        const activePolls = polls.filter((p) => p.status === 'active').slice(0, 2);
+        if (!activePolls.length) {
+          document.getElementById('active-polls').innerHTML = '<p class="muted-link">No active polls</p>';
+        } else {
+          let html = '';
+          activePolls.forEach((p) => {
+            const yes = p.votes.filter((v) => v.vote === 'yes').length;
+            const pct = Math.round((yes / p.threshold) * 100);
+
+            html += `<div class="list-item">
+              <p class="list-item-title">${p.title}</p>
+              <div class="poll-progress">
+                <div class="poll-progress-fill ${pct >= 100 ? 'reached' : ''}" style="width:${Math.min(pct, 100)}%"></div>
+              </div>
+              <p class="list-item-sub">${yes}/${p.threshold} votes needed</p>
+            </div>`;
+          });
+          document.getElementById('active-polls').innerHTML = html;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    loadTodayMess();
+    loadTodayTT();
+    loadRecentNotes();
+    loadStats();
+  </script>
+</body>
+</html>
