@@ -44,6 +44,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
+app.get('/api/health', async (req, res) => {
+  try {
+    await connectDB();
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('MongoDB connection failed:', err.message);
+    res.status(500).json({ status: 'error', message: 'Database connection failed' });
+  }
+});
+
 app.use('/api', async (req, res, next) => {
   try {
     await connectDB();

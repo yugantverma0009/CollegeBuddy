@@ -40,6 +40,14 @@ http://localhost:5000
 cd backend
 npm start
 ```
+- Split deployment setup in this repo:
+  - Vercel serves the static frontend from `public/`
+  - Render serves the backend from `backend/`
+  - Frontend production API default is `https://collegebuddy-backend.onrender.com/api`
+- Render health check endpoint:
+```
+/api/health
+```
 
 ---
 
