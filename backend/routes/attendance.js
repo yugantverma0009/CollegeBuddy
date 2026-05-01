@@ -1,12 +1,88 @@
 const express = require('express');
 const router = express.Router();
 const Attendance = require('../models/Attendance');
+const StudentAttendanceTracker = require('../models/StudentAttendanceTracker');
 const User = require('../models/User');
 const { protect, teacherOnly } = require('../middleware/auth');
 const {
   normalizeDepartment,
   buildDepartmentFilter
 } = require('../utils/department');
+
+function sanitizeTrackerSubjects(subjects = []) {
+  return subjects
+    .filter(subject => subject && typeof subject.name === 'string')
+    .map(subject => ({
+      id: String(subject.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+      name: subject.name.trim(),
+      totalClasses: Math.max(0, Number(subject.totalClasses) || 0),
+      attendedClasses: Math.max(0, Number(subject.attendedClasses) || 0)
+    }))
+    .filter(subject => subject.name);
+}
+
+// Get or create the current student's personal attendance tracker bucket
+router.get('/tracker/:branch/:semester', protect, async (req, res) => {
+  try {
+    const branch = normalizeDepartment(req.params.branch);
+    const semester = String(req.params.semester).trim();
+
+    const tracker = await StudentAttendanceTracker.findOne({
+      student: req.user._id,
+      branch,
+      semester
+    }).lean();
+
+    if (!tracker) {
+      return res.json({ branch, semester, subjects: [] });
+    }
+
+    res.json({
+      branch: tracker.branch,
+      semester: tracker.semester,
+      subjects: tracker.subjects || []
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Save the current student's personal attendance tracker bucket
+router.put('/tracker/:branch/:semester', protect, async (req, res) => {
+  try {
+    const branch = normalizeDepartment(req.params.branch);
+    const semester = String(req.params.semester).trim();
+    const subjects = sanitizeTrackerSubjects(req.body.subjects);
+
+    const tracker = await StudentAttendanceTracker.findOneAndUpdate(
+      {
+        student: req.user._id,
+        branch,
+        semester
+      },
+      {
+        $set: {
+          branch,
+          semester,
+          subjects
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    ).lean();
+
+    res.json({
+      branch: tracker.branch,
+      semester: tracker.semester,
+      subjects: tracker.subjects || []
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Get my attendance (student)
 router.get('/my', protect, async (req, res) => {
