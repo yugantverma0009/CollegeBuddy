@@ -5,13 +5,8 @@ const path = require('path');
 const LostFound = require('../models/LostFound');
 const { protect } = require('../middleware/auth');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../public/uploads')),
-  filename: (req, file, cb) => cb(null, 'lf-' + Date.now() + path.extname(file.originalname))
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -20,6 +15,10 @@ const upload = multer({
   }
 });
 
+function buildLostFoundPhotoUrl(postId) {
+  return `/api/lostfound/${postId}/photo`;
+}
+
 // Get active posts
 router.get('/', protect, async (req, res) => {
   try {
@@ -27,6 +26,9 @@ router.get('/', protect, async (req, res) => {
       .populate('postedBy', 'name')
       .populate('comments.user', 'name')
       .sort({ createdAt: -1 });
+    posts.forEach(post => {
+      if (post.photoData?.length) post.photo = buildLostFoundPhotoUrl(post._id);
+    });
     res.json(posts);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -37,16 +39,41 @@ router.get('/', protect, async (req, res) => {
 router.post('/', protect, upload.single('photo'), async (req, res) => {
   try {
     const { description, foundAt, collectFrom, phone } = req.body;
-    const photo = req.file ? '/uploads/' + req.file.filename : '';
-
     const post = await LostFound.create({
-      photo, description, foundAt, collectFrom, phone,
+      photo: '',
+      photoMimeType: req.file?.mimetype || '',
+      photoData: req.file?.buffer || undefined,
+      description, foundAt, collectFrom, phone,
       postedBy: req.user._id
     });
+    if (req.file) {
+      post.photo = buildLostFoundPhotoUrl(post._id);
+      await post.save();
+    }
 
     res.status(201).json(post);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/:id/photo', async (req, res) => {
+  try {
+    const post = await LostFound.findById(req.params.id).select('photo photoMimeType photoData');
+    if (!post) return res.status(404).send('Not found');
+
+    if (post.photoData?.length) {
+      res.setHeader('Content-Type', post.photoMimeType || 'application/octet-stream');
+      return res.send(post.photoData);
+    }
+
+    if (post.photo) {
+      return res.redirect(post.photo);
+    }
+
+    res.status(404).send('Photo not found');
+  } catch (err) {
+    res.status(500).send('Server error');
   }
 });
 

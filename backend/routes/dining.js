@@ -13,13 +13,8 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../public/uploads')),
-  filename: (req, file, cb) => cb(null, 'dining-' + Date.now() + path.extname(file.originalname))
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -27,6 +22,10 @@ const upload = multer({
     else cb(new Error('Images only'));
   }
 });
+
+function buildDiningPhotoUrl(placeId) {
+  return `/api/dining/${placeId}/photo`;
+}
 
 // Get all dining places
 router.get('/', protect, async (req, res) => {
@@ -36,6 +35,9 @@ router.get('/', protect, async (req, res) => {
       .populate('reviews.user', 'name')
       .populate('comments.user', 'name')
       .sort({ avgRating: -1 });
+    places.forEach(place => {
+      if (place.photoData?.length) place.photo = buildDiningPhotoUrl(place._id);
+    });
     res.json(places);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -48,8 +50,6 @@ router.post('/', protect, upload.single('photo'), async (req, res) => {
     const name = String(req.body.name || '').trim();
     const mapLink = String(req.body.mapLink || '').trim();
     const description = String(req.body.description || '').trim();
-    const photo = req.file ? '/uploads/' + req.file.filename : '';
-
     if (!name) {
       return res.status(400).json({ message: 'Place name is required' });
     }
@@ -65,9 +65,15 @@ router.post('/', protect, upload.single('photo'), async (req, res) => {
     }
 
     const place = await DiningPlace.create({
-      name, mapLink, description, photo,
+      name, mapLink, description, photo: '',
+      photoMimeType: req.file?.mimetype || '',
+      photoData: req.file?.buffer || undefined,
       uploadedBy: req.user._id
     });
+    if (req.file) {
+      place.photo = buildDiningPhotoUrl(place._id);
+      await place.save();
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
@@ -83,6 +89,26 @@ router.post('/', protect, upload.single('photo'), async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/:id/photo', async (req, res) => {
+  try {
+    const place = await DiningPlace.findById(req.params.id).select('photo photoMimeType photoData');
+    if (!place) return res.status(404).send('Not found');
+
+    if (place.photoData?.length) {
+      res.setHeader('Content-Type', place.photoMimeType || 'application/octet-stream');
+      return res.send(place.photoData);
+    }
+
+    if (place.photo) {
+      return res.redirect(place.photo);
+    }
+
+    res.status(404).send('Photo not found');
+  } catch (err) {
+    res.status(500).send('Server error');
   }
 });
 

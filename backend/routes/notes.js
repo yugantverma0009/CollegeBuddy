@@ -29,13 +29,8 @@ async function awardFirstAccessBonus(note, accessorId) {
   return true;
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../public/uploads')),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s/g, '_'))
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: (req, file, cb) => {
     const allowed = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.jpg', '.jpeg', '.png'];
@@ -44,6 +39,10 @@ const upload = multer({
     else cb(new Error('File type not allowed'));
   }
 });
+
+function buildNoteFileUrl(noteId) {
+  return `/api/notes/${noteId}/file`;
+}
 
 // Get all notes (filter by dept/year)
 router.get('/', protect, async (req, res) => {
@@ -73,8 +72,6 @@ router.post('/', protect, upload.single('file'), async (req, res) => {
     const department = normalizeDepartment(req.body.department || req.user.department);
     const year = req.body.year || req.user.year;
     const price = Number(req.body.price || 0);
-    const fileUrl = req.file ? '/uploads/' + req.file.filename : '';
-
     if (!title || !subject) {
       return res.status(400).json({ message: 'Title and subject are required' });
     }
@@ -97,12 +94,17 @@ router.post('/', protect, upload.single('file'), async (req, res) => {
 
     const note = await Note.create({
       title, subject, description,
-      fileUrl,
+      fileUrl: '',
+      fileOriginalName: req.file.originalname,
+      fileMimeType: req.file.mimetype,
+      fileData: req.file.buffer,
       uploadedBy: req.user._id,
       department,
       year,
       price: Number.isFinite(price) && price > 0 ? price : 0
     });
+    note.fileUrl = buildNoteFileUrl(note._id);
+    await note.save();
     normalizeDepartmentField(note);
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -119,6 +121,36 @@ router.post('/', protect, upload.single('file'), async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/:id/file', protect, async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id).select('fileUrl fileOriginalName fileMimeType fileData price buyers uploadedBy');
+    if (!note) return res.status(404).send('Not found');
+
+    const uploaderId = String(note.uploadedBy);
+    const requesterId = String(req.user._id);
+    const alreadyBought = note.buyers.some((buyerId) => String(buyerId) === requesterId);
+    const hasAccess = requesterId === uploaderId || note.price === 0 || alreadyBought;
+
+    if (!hasAccess) {
+      return res.status(403).send('Purchase required');
+    }
+
+    if (note.fileData?.length) {
+      res.setHeader('Content-Type', note.fileMimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${(note.fileOriginalName || 'note-file').replace(/"/g, '')}"`);
+      return res.send(note.fileData);
+    }
+
+    if (note.fileUrl) {
+      return res.redirect(note.fileUrl);
+    }
+
+    res.status(404).send('File not found');
+  } catch (err) {
+    res.status(500).send('Server error');
   }
 });
 
@@ -169,7 +201,7 @@ router.post('/:id/buy', protect, async (req, res) => {
       await note.save();
       return res.json({
         message: 'Access granted',
-        fileUrl: note.fileUrl,
+        fileUrl: buildNoteFileUrl(note._id),
         uploaderBonusAwarded,
         buyerPoints: null
       });
@@ -195,7 +227,7 @@ router.post('/:id/buy', protect, async (req, res) => {
 
     res.json({
       message: 'Purchase successful',
-      fileUrl: note.fileUrl,
+      fileUrl: buildNoteFileUrl(note._id),
       uploaderBonusAwarded,
       buyerPoints: updatedBuyer?.points || 0
     });

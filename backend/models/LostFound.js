@@ -8,6 +8,8 @@ const commentSchema = new mongoose.Schema({
 
 const lostFoundSchema = new mongoose.Schema({
   photo: { type: String },
+  photoMimeType: { type: String },
+  photoData: { type: Buffer },
   description: { type: String, required: true },
   foundAt: { type: String, required: true },
   collectFrom: { type: String, required: true },

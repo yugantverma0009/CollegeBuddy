@@ -18,6 +18,8 @@ const diningPlaceSchema = new mongoose.Schema({
   mapLink: { type: String },
   description: { type: String },
   photo: { type: String },
+  photoMimeType: { type: String },
+  photoData: { type: Buffer },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   reviews: [reviewSchema],
   comments: [commentSchema],
