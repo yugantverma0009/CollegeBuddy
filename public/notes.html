@@ -1,18 +1,341 @@
 <!DOCTYPE html>
 <html lang="en">
-<head> <meta charset="UTF-8"/> <meta name="viewport" content="width=device-width, initial-scale=1.0"/> <title>Study Notes - College Buddy</title> <link rel="stylesheet" href="/css/style.css"/>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Study Notes - College Buddy</title>
+  <link rel="stylesheet" href="/css/style.css"/>
 </head>
 <body>
-<div class="topbar"> <button id="menu-toggle">☰</button> <h2>Study Notes</h2>
-</div> <div class="app-layout"> <div id="sidebar-container"></div> <main class="main-content"> <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"> <div> <h1> Study Notes</h1> <p>Upload and buy notes from toppers. Earn points for sharing!</p> </div> <button class="btn btn-primary" id="upload-btn">+ Upload Note</button> </div> <div class="filter-bar"> <input type="text" id="search" placeholder="Search by title or subject..."/> <select id="filter-dept"> <option value="">All Departments</option> <option value="CSE">CSE</option> <option value="ME">ME</option> <option value="ECE">ECE</option> <option value="Civil">Civil</option> <option value="EE">EE</option> </select> <select id="filter-year"> <option value="">All Years</option> <option value="1Y">1st Year</option> <option value="2Y">2nd Year</option> <option value="3Y">3rd Year</option> <option value="4Y">4th Year</option> </select> <button class="btn btn-secondary" id="filter-btn">Filter</button> </div> <div id="alert-box"></div> <div class="grid-3" id="notes-grid"> <div class="card grid-empty"> <div class="skeleton-line"></div> <div class="skeleton-line"></div> <div class="skeleton-line"></div> </div> </div> </main>
-</div> <!-- Upload Modal -->
-<div class="modal-overlay" id="upload-modal"> <div class="modal"> <button class="modal-close" id="close-upload">✕</button> <h3> Upload Study Note</h3> <p style="font-size:0.82rem;color:#64748b;margin-bottom:16px"> Share helpful notes with your class and earn points. </p> <div id="upload-alert"></div> <form id="upload-form" enctype="multipart/form-data"> <div class="form-group"> <label>Title *</label> <input type="text" id="note-title" placeholder="e.g. Data Structures Unit 3 Notes" required/> </div> <div class="form-row"> <div class="form-group"> <label>Subject *</label> <input type="text" id="note-subject" placeholder="Subject name" required/> </div> <div class="form-group"> <label>Price (in points)</label> <input type="number" id="note-price" placeholder="0 = Free" min="0" value="0"/> </div> </div> <div class="form-row"> <div class="form-group"> <label>Department</label> <select id="note-dept"> <option value="">My Dept</option> <option value="CSE">CSE</option> <option value="ME">ME</option> <option value="ECE">ECE</option> <option value="Civil">Civil</option> <option value="EE">EE</option> </select> </div> <div class="form-group"> <label>Year</label> <select id="note-year"> <option value="">My Year</option> <option value="1Y">1st Year</option> <option value="2Y">2nd Year</option> <option value="3Y">3rd Year</option> <option value="4Y">4th Year</option> </select> </div> </div> <div class="form-group"> <label>Description</label> <textarea id="note-desc" rows="3" placeholder="What topics are covered?"></textarea> </div> <div class="form-group"> <label>File (PDF, DOC, PPT, Image)</label> <input type="file" id="note-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png"/> </div> <button type="submit" class="btn btn-primary btn-full" id="upload-submit">Upload Note</button> </form> </div>
-</div> <!-- Note Detail Modal -->
-<div class="modal-overlay" id="detail-modal"> <div class="modal" style="max-width:600px"> <button class="modal-close" id="close-detail">✕</button> <div id="note-detail-content"></div> </div>
-</div> <script src="/js/config.js"></script>
+  <div class="topbar">
+    <button id="menu-toggle">☰</button>
+    <h2>Study Notes</h2>
+  </div>
+
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <h1>Study Notes</h1>
+          <p>Upload strong notes, earn 2 points now, and unlock a bonus when classmates actually use them.</p>
+        </div>
+        <button class="btn btn-primary" id="upload-btn">+ Upload Note</button>
+      </div>
+
+      <div class="filter-bar">
+        <input type="text" id="search" placeholder="Search by title or subject..."/>
+        <select id="filter-dept">
+          <option value="">All Departments</option>
+          <option value="CSE">CSE</option>
+          <option value="ME">ME</option>
+          <option value="ECE">ECE</option>
+          <option value="Civil">Civil</option>
+          <option value="EE">EE</option>
+        </select>
+        <select id="filter-year">
+          <option value="">All Years</option>
+          <option value="1Y">1st Year</option>
+          <option value="2Y">2nd Year</option>
+          <option value="3Y">3rd Year</option>
+          <option value="4Y">4th Year</option>
+        </select>
+        <button class="btn btn-secondary" id="filter-btn">Filter</button>
+      </div>
+
+      <div id="alert-box"></div>
+      <div class="grid-3" id="notes-grid">
+        <div class="card grid-empty">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="upload-modal">
+    <div class="modal">
+      <button class="modal-close" id="close-upload">✕</button>
+      <h3>Upload Study Note</h3>
+      <p style="font-size:0.82rem;color:#64748b;margin-bottom:16px">
+        Earn 2 points now and 3 bonus points when another student unlocks your note first.
+      </p>
+      <div id="upload-alert"></div>
+      <form id="upload-form" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="note-title" placeholder="e.g. Data Structures Unit 3 Notes" required/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Subject *</label>
+            <input type="text" id="note-subject" placeholder="Subject name" required/>
+          </div>
+          <div class="form-group">
+            <label>Price (in points)</label>
+            <input type="number" id="note-price" placeholder="0 = Free" min="0" value="0"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Department</label>
+            <select id="note-dept">
+              <option value="">My Dept</option>
+              <option value="CSE">CSE</option>
+              <option value="ME">ME</option>
+              <option value="ECE">ECE</option>
+              <option value="Civil">Civil</option>
+              <option value="EE">EE</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Year</label>
+            <select id="note-year">
+              <option value="">My Year</option>
+              <option value="1Y">1st Year</option>
+              <option value="2Y">2nd Year</option>
+              <option value="3Y">3rd Year</option>
+              <option value="4Y">4th Year</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="note-desc" rows="3" placeholder="What topics are covered?"></textarea>
+        </div>
+        <div class="form-group">
+          <label>File *</label>
+          <input type="file" id="note-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png" required/>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="upload-submit">Upload Note</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:600px">
+      <button class="modal-close" id="close-detail">✕</button>
+      <div id="note-detail-content"></div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
-<script src="/js/sidebar.js"></script>
-<script> if (!requireAuth()) throw new Error(); renderSidebar(); const user = getUser(); let allNotes = []; document.getElementById('filter-dept').value = user.department || ''; document.getElementById('filter-year').value = user.year || ''; document.getElementById('note-dept').value = user.department || ''; document.getElementById('note-year').value = user.year || ''; persistFilterState('cb_notes_filters', ['search', 'filter-dept', 'filter-year']); async function loadNotes(dept='', year='', q='') { let url = '/notes?'; if (dept) url += `department=${dept}&`; if (year) url += `year=${year}&`; try { allNotes = await apiFetch(url); renderNotes(q); } catch(e) { document.getElementById('notes-grid').innerHTML = `<div class="empty-state grid-empty"><div class="empty-mark"></div><p>${e.message}</p><p class="muted-link">Try starting backend server and refreshing.</p></div>`; } } function renderNotes(q='') { const grid = document.getElementById('notes-grid'); let data = allNotes; if (q) data = data.filter(n => n.title.toLowerCase().includes(q.toLowerCase()) || n.subject.toLowerCase().includes(q.toLowerCase())); if (!data.length) { grid.innerHTML = `<div class="empty-state grid-empty"><div class="empty-mark"></div><p>No notes found</p></div>`; return; } grid.innerHTML = data.map(n => ` <div class="note-card" onclick="openNote('${n._id}')"> <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"> <h4>${n.title}</h4> ${n.price > 0 ? `<span class="points-badge"> ${n.price}</span>` : '<span class="badge badge-success">Free</span>'} </div> <div class="note-meta"> <span class="badge badge-info">${n.subject}</span> <span class="badge badge-student">${n.department} ${n.year}</span> </div> <p style="font-size:0.82rem;color:#64748b;margin-bottom:10px">${n.description || 'No description'}</p> <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#94a3b8"> <span>by ${n.uploadedBy?.name || 'Unknown'}</span> <span> ${n.comments?.length || 0} • ${n.downloads || 0}</span> </div> </div> `).join(''); } async function openNote(id) { const n = allNotes.find(x => x._id === id); if (!n) return; const alreadyBought = n.buyers?.includes(user._id); const isFree = n.price === 0; const isOwner = n.uploadedBy?._id === user._id || n.uploadedBy === user._id; const comments = (n.comments || []).map(c => ` <div class="comment"> <div class="comment-avatar">${getInitials(c.user?.name || 'U')}</div> <div class="comment-body"> <p class="author">${c.user?.name || 'Unknown'}</p> <p class="text">${c.text}</p> <p class="time">${timeSince(c.createdAt)}</p> </div> </div> `).join(''); document.getElementById('note-detail-content').innerHTML = ` <h3>${n.title}</h3> <div class="note-meta" style="margin:10px 0"> <span class="badge badge-info">${n.subject}</span> <span class="badge badge-student">${n.department} ${n.year}</span> ${n.price > 0 ? `<span class="points-badge"> ${n.price} pts</span>` : '<span class="badge badge-success">Free</span>'} </div> <p style="font-size:0.88rem;color:#64748b;margin-bottom:16px">${n.description || ''}</p> <p style="font-size:0.82rem;margin-bottom:16px">Uploaded by <strong>${n.uploadedBy?.name}</strong></p> <div id="note-alert"></div> ${(isFree || alreadyBought || isOwner || ['teacher','cr','admin'].includes(user.role)) && n.fileUrl ? `<a href="${n.fileUrl}" target="_blank" class="btn btn-success" style="margin-bottom:16px"> Download File</a>` : n.price > 0 ? `<button class="btn btn-warning" onclick="buyNote('${n._id}',${n.price})" style="margin-bottom:16px"> Buy for ${n.price} pts</button>` : `<p style="color:#64748b;font-size:0.85rem;margin-bottom:16px">No file attached</p>` } <h4 style="margin-bottom:12px">Comments (${n.comments?.length || 0})</h4> <div>${comments || '<p style="color:#94a3b8;font-size:0.85rem">No comments yet</p>'}</div> <div style="display:flex;gap:8px;margin-top:14px"> <input type="text" id="comment-input-${id}" placeholder="Add a comment..." style="flex:1;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.88rem"/> <button class="btn btn-primary btn-sm" onclick="addComment('${id}')">Post</button> </div> `; document.getElementById('detail-modal').classList.add('show'); } async function buyNote(id, price) { try { const res = await apiFetch(`/notes/${id}/buy`, { method: 'POST' }); showAlert('note-alert', res.message, 'success'); await loadNotes(); } catch(e) { showAlert('note-alert', e.message, 'danger'); } } async function addComment(id) { const input = document.getElementById(`comment-input-${id}`); const text = input.value.trim(); if (!text) return; try { await apiFetch(`/notes/${id}/comment`, { method: 'POST', body: JSON.stringify({ text }) }); input.value = ''; await loadNotes(); openNote(id); } catch(e) { alert(e.message); } } document.getElementById('upload-btn').addEventListener('click', () => { document.getElementById('upload-modal').classList.add('show'); }); document.getElementById('close-upload').addEventListener('click', () => { document.getElementById('upload-modal').classList.remove('show'); }); document.getElementById('close-detail').addEventListener('click', () => { document.getElementById('detail-modal').classList.remove('show'); }); document.getElementById('filter-btn').addEventListener('click', () => { loadNotes( document.getElementById('filter-dept').value, document.getElementById('filter-year').value, document.getElementById('search').value ); }); document.getElementById('search').addEventListener('input', (e) => { renderNotes(e.target.value); }); document.getElementById('upload-form').addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('upload-submit'); btn.disabled = true; btn.textContent = 'Uploading...'; const fd = new FormData(); fd.append('title', document.getElementById('note-title').value); fd.append('subject', document.getElementById('note-subject').value); fd.append('price', document.getElementById('note-price').value || 0); fd.append('description', document.getElementById('note-desc').value); fd.append('department', document.getElementById('note-dept').value || user.department); fd.append('year', document.getElementById('note-year').value || user.year); const file = document.getElementById('note-file').files[0]; if (file) fd.append('file', file); try { await apiFetch('/notes', { method: 'POST', body: fd, headers: {} }); showAlert('upload-alert', 'Note uploaded! You earned 5 points.', 'success'); document.getElementById('upload-form').reset(); await loadNotes(); } catch(e) { showAlert('upload-alert', e.message, 'danger'); } btn.disabled = false; btn.textContent = 'Upload Note'; }); loadNotes(document.getElementById('filter-dept').value, document.getElementById('filter-year').value, document.getElementById('search').value);
-</script>
+  <script src="/js/sidebar.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error();
+    renderSidebar();
+
+    let user = getUser();
+    let allNotes = [];
+
+    function isBuyerMatch(value) {
+      return String(value?._id || value) === String(user._id);
+    }
+
+    document.getElementById('filter-dept').value = user.department || '';
+    document.getElementById('filter-year').value = user.year || '';
+    document.getElementById('note-dept').value = user.department || '';
+    document.getElementById('note-year').value = user.year || '';
+    persistFilterState('cb_notes_filters', ['search', 'filter-dept', 'filter-year']);
+
+    async function loadNotes(dept = '', year = '', q = '') {
+      let url = '/notes?';
+      if (dept) url += `department=${dept}&`;
+      if (year) url += `year=${year}&`;
+
+      try {
+        allNotes = await apiFetch(url);
+        renderNotes(q);
+      } catch (e) {
+        document.getElementById('notes-grid').innerHTML =
+          `<div class="empty-state grid-empty"><div class="empty-mark"></div><p>${e.message}</p><p class="muted-link">Try starting backend server and refreshing.</p></div>`;
+      }
+    }
+
+    function renderNotes(q = '') {
+      const grid = document.getElementById('notes-grid');
+      let data = allNotes;
+
+      if (q) {
+        data = data.filter((note) =>
+          note.title.toLowerCase().includes(q.toLowerCase()) ||
+          note.subject.toLowerCase().includes(q.toLowerCase())
+        );
+      }
+
+      if (!data.length) {
+        grid.innerHTML = `<div class="empty-state grid-empty"><div class="empty-mark"></div><p>No notes found</p></div>`;
+        return;
+      }
+
+      grid.innerHTML = data.map((note) => `
+        <div class="note-card" onclick="openNote('${note._id}')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <h4>${note.title}</h4>
+            ${note.price > 0 ? `<span class="points-badge">${note.price}</span>` : '<span class="badge badge-success">Free</span>'}
+          </div>
+          <div class="note-meta">
+            <span class="badge badge-info">${note.subject}</span>
+            <span class="badge badge-student">${note.department} ${note.year}</span>
+          </div>
+          <p style="font-size:0.82rem;color:#64748b;margin-bottom:10px">${note.description || 'No description'}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#94a3b8">
+            <span>by ${note.uploadedBy?.name || 'Unknown'}</span>
+            <span>${note.comments?.length || 0} • ${note.downloads || 0}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function openNote(id) {
+      const note = allNotes.find((entry) => entry._id === id);
+      if (!note) return;
+
+      const alreadyBought = (note.buyers || []).some(isBuyerMatch);
+      const isFree = note.price === 0;
+      const isOwner = String(note.uploadedBy?._id || note.uploadedBy) === String(user._id);
+      const comments = (note.comments || []).map((comment) => `
+        <div class="comment">
+          <div class="comment-avatar">${getInitials(comment.user?.name || 'U')}</div>
+          <div class="comment-body">
+            <p class="author">${comment.user?.name || 'Unknown'}</p>
+            <p class="text">${comment.text}</p>
+            <p class="time">${timeSince(comment.createdAt)}</p>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('note-detail-content').innerHTML = `
+        <h3>${note.title}</h3>
+        <div class="note-meta" style="margin:10px 0">
+          <span class="badge badge-info">${note.subject}</span>
+          <span class="badge badge-student">${note.department} ${note.year}</span>
+          ${note.price > 0 ? `<span class="points-badge">${note.price} pts</span>` : '<span class="badge badge-success">Free</span>'}
+        </div>
+        <p style="font-size:0.88rem;color:#64748b;margin-bottom:16px">${note.description || ''}</p>
+        <p style="font-size:0.82rem;margin-bottom:16px">Uploaded by <strong>${note.uploadedBy?.name}</strong></p>
+        <div id="note-alert"></div>
+        ${(((isFree && (alreadyBought || isOwner || ['teacher', 'cr', 'admin'].includes(user.role))) || (!isFree && (alreadyBought || isOwner || ['teacher', 'cr', 'admin'].includes(user.role)))) && note.fileUrl)
+          ? `<a href="${note.fileUrl}" target="_blank" class="btn btn-success" style="margin-bottom:16px">Download File</a>`
+          : isFree && note.fileUrl
+            ? `<button class="btn btn-success" onclick="buyNote('${note._id}')" style="margin-bottom:16px">Access Free Note</button>`
+            : note.price > 0
+            ? `<button class="btn btn-warning" onclick="buyNote('${note._id}')" style="margin-bottom:16px">Buy for ${note.price} pts</button>`
+            : `<p style="color:#64748b;font-size:0.85rem;margin-bottom:16px">No file attached</p>`}
+        <h4 style="margin-bottom:12px">Comments (${note.comments?.length || 0})</h4>
+        <div>${comments || '<p style="color:#94a3b8;font-size:0.85rem">No comments yet</p>'}</div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <input type="text" id="comment-input-${id}" placeholder="Add a comment..." style="flex:1;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.88rem"/>
+          <button class="btn btn-primary btn-sm" onclick="addComment('${id}')">Post</button>
+        </div>
+      `;
+
+      document.getElementById('detail-modal').classList.add('show');
+    }
+
+    async function buyNote(id) {
+      try {
+        const res = await apiFetch(`/notes/${id}/buy`, { method: 'POST' });
+        if (typeof res.buyerPoints === 'number') {
+          user = updateStoredUser({ points: res.buyerPoints }) || getUser();
+        }
+        const extra = res.uploaderBonusAwarded ? ' The uploader also earned a first-unlock bonus.' : '';
+        showAlert('note-alert', `${res.message}${extra}`, 'success');
+        await loadNotes();
+        if (res.fileUrl) {
+          window.open(res.fileUrl, '_blank');
+        }
+      } catch (e) {
+        showAlert('note-alert', e.message, 'danger');
+      }
+    }
+
+    async function addComment(id) {
+      const input = document.getElementById(`comment-input-${id}`);
+      const text = input.value.trim();
+      if (!text) return;
+
+      try {
+        await apiFetch(`/notes/${id}/comment`, {
+          method: 'POST',
+          body: JSON.stringify({ text })
+        });
+        input.value = '';
+        await loadNotes();
+        openNote(id);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    document.getElementById('upload-btn').addEventListener('click', () => {
+      document.getElementById('upload-modal').classList.add('show');
+    });
+
+    document.getElementById('close-upload').addEventListener('click', () => {
+      document.getElementById('upload-modal').classList.remove('show');
+    });
+
+    document.getElementById('close-detail').addEventListener('click', () => {
+      document.getElementById('detail-modal').classList.remove('show');
+    });
+
+    document.getElementById('filter-btn').addEventListener('click', () => {
+      loadNotes(
+        document.getElementById('filter-dept').value,
+        document.getElementById('filter-year').value,
+        document.getElementById('search').value
+      );
+    });
+
+    document.getElementById('search').addEventListener('input', (e) => {
+      renderNotes(e.target.value);
+    });
+
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('upload-submit');
+      const uploadOverlay = createTaskOverlay({
+        title: 'Uploading note',
+        detail: 'Securing your file and preparing it for your classmates.'
+      });
+      setButtonLoading(btn, true, 'Upload Note', 'Uploading...');
+
+      const fd = new FormData();
+      fd.append('title', document.getElementById('note-title').value);
+      fd.append('subject', document.getElementById('note-subject').value);
+      fd.append('price', document.getElementById('note-price').value || 0);
+      fd.append('description', document.getElementById('note-desc').value);
+      fd.append('department', document.getElementById('note-dept').value || user.department);
+      fd.append('year', document.getElementById('note-year').value || user.year);
+
+      const file = document.getElementById('note-file').files[0];
+      if (file) fd.append('file', file);
+
+      try {
+        const res = await apiFetch('/notes', { method: 'POST', body: fd, headers: {} });
+        uploadOverlay.update('Finishing up', 'Updating your points and refreshing the note feed.');
+        user = updateStoredUser({ points: res.userPoints }) || getUser();
+        await uploadOverlay.succeed('Your note is live and the dashboard is refreshing now.');
+        showAlert('upload-alert', `Note uploaded! You earned ${res.pointsAwarded} points. ${res.bonusHint}`, 'success');
+        document.getElementById('upload-form').reset();
+        await loadNotes();
+        document.getElementById('upload-modal').classList.remove('show');
+      } catch (e) {
+        uploadOverlay.remove();
+        showAlert('upload-alert', e.message, 'danger');
+      }
+
+      setButtonLoading(btn, false, 'Upload Note');
+    });
+
+    loadNotes(
+      document.getElementById('filter-dept').value,
+      document.getElementById('filter-year').value,
+      document.getElementById('search').value
+    );
+  </script>
 </body>
 </html>

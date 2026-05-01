@@ -35,6 +35,7 @@ router.get('/', protect, async (req, res) => {
     let filter = {};
     if (department) filter.department = buildDepartmentFilter(department);
     if (year) filter.year = year;
+    if (req.user.role === 'teacher') filter.sentToTeacher = true;
 
     const polls = await Poll.find(filter)
       .populate('createdBy', 'name')

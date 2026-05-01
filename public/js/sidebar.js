@@ -20,15 +20,15 @@ function renderSidebar() {
 
       <nav>
         <div class="nav-section">Main</div>
-        <a href="/dashboard.html"><span class="icon"></span>Dashboard</a>
-        <a href="/notes.html"><span class="icon"></span>Study Notes</a>
-        <a href="/mess.html"><span class="icon"></span>Mess Menu</a>
-        <a href="/lostfound.html"><span class="icon"></span>Lost &amp; Found</a>
-        <a href="/attendance.html"><span class="icon"></span>Attendance</a>
+        <a href="/dashboard.html" data-hide-role="teacher"><span class="icon"></span>Dashboard</a>
+        <a href="/notes.html" data-hide-role="teacher"><span class="icon"></span>Study Notes</a>
+        <a href="/mess.html" data-hide-role="teacher"><span class="icon"></span>Mess Menu</a>
+        <a href="/lostfound.html" data-hide-role="teacher"><span class="icon"></span>Lost &amp; Found</a>
+        <a href="/attendance.html" data-hide-role="teacher"><span class="icon"></span>Attendance</a>
         <a href="/timetable.html"><span class="icon"></span>Timetable</a>
-        <a href="/students.html"><span class="icon"></span>Student Directory</a>
-        <a href="/dining.html"><span class="icon"></span>Dining Places</a>
-        <a href="/polls.html"><span class="icon"></span>Bunk Polls</a>
+        <a href="/students.html" data-role="non-student" data-hide-role="teacher"><span class="icon"></span>Student Directory</a>
+        <a href="/dining.html" data-hide-role="teacher"><span class="icon"></span>Dining Places</a>
+        <a href="/polls.html"><span class="icon"></span>Polls</a>
 
         <div class="nav-section" data-role="admin">Admin</div>
         <a href="/admin.html" data-role="admin"><span class="icon"></span>Admin Panel</a>

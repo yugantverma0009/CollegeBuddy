@@ -8,6 +8,8 @@ services:
     healthCheckPath: /api/health
     plan: free
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET

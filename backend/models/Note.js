@@ -17,7 +17,8 @@ const noteSchema = new mongoose.Schema({
   price: { type: Number, default: 0 },
   comments: [commentSchema],
   buyers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  downloads: { type: Number, default: 0 }
+  downloads: { type: Number, default: 0 },
+  firstAccessRewardGranted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Note', noteSchema);

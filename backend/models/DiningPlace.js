@@ -21,7 +21,8 @@ const diningPlaceSchema = new mongoose.Schema({
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   reviews: [reviewSchema],
   comments: [commentSchema],
-  avgRating: { type: Number, default: 0 }
+  avgRating: { type: Number, default: 0 },
+  firstReviewRewardGranted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('DiningPlace', diningPlaceSchema);

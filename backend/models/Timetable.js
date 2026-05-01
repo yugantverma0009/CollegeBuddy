@@ -6,6 +6,8 @@ const periodSchema = new mongoose.Schema({
   teacherName: String,
   group: { type: String, enum: ['ALL', 'G1', 'G2'], default: 'ALL' },
   room: String,
+  isExtraClass: { type: Boolean, default: false },
+  addedByTeacher: { type: Boolean, default: false },
   status: { type: String, enum: ['normal', 'cancelled', 'rescheduled'], default: 'normal' },
   note: String           // info for cancel/reschedule
 });

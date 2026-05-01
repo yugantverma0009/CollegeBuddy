@@ -28,6 +28,28 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+router.get('/leaderboard/top', protect, async (req, res) => {
+  try {
+    const { department } = req.query;
+    const filter = { role: { $in: ['student', 'cr'] } };
+    if (department) filter.department = buildDepartmentFilter(department);
+
+    const topStudents = await User.find(filter)
+      .select('name department year points profilePic')
+      .sort({ points: -1, createdAt: 1 })
+      .limit(3);
+
+    if (!topStudents.length) {
+      return res.status(404).json({ message: 'No students found' });
+    }
+
+    topStudents.forEach(normalizeDepartmentField);
+    res.json(topStudents);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get single user details
 router.get('/:id', protect, async (req, res) => {
   try {

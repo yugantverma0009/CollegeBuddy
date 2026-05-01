@@ -6,6 +6,13 @@ const DiningPlace = require('../models/DiningPlace');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
+const DINING_UPLOAD_POINTS = 4;
+const DINING_FIRST_REVIEW_BONUS_POINTS = 4;
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../../public/uploads')),
   filename: (req, file, cb) => cb(null, 'dining-' + Date.now() + path.extname(file.originalname))
@@ -38,18 +45,42 @@ router.get('/', protect, async (req, res) => {
 // Add a dining place
 router.post('/', protect, upload.single('photo'), async (req, res) => {
   try {
-    const { name, mapLink, description } = req.body;
+    const name = String(req.body.name || '').trim();
+    const mapLink = String(req.body.mapLink || '').trim();
+    const description = String(req.body.description || '').trim();
     const photo = req.file ? '/uploads/' + req.file.filename : '';
+
+    if (!name) {
+      return res.status(400).json({ message: 'Place name is required' });
+    }
+
+    const duplicateFilter = [
+      { name: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } }
+    ];
+    if (mapLink) duplicateFilter.push({ mapLink });
+
+    const existingPlace = await DiningPlace.findOne({ $or: duplicateFilter });
+    if (existingPlace) {
+      return res.status(409).json({ message: 'This dining place already exists. Add a review instead of uploading it again.' });
+    }
 
     const place = await DiningPlace.create({
       name, mapLink, description, photo,
       uploadedBy: req.user._id
     });
 
-    // reward the user
-    await User.findByIdAndUpdate(req.user._id, { $inc: { points: 10 } });
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { points: DINING_UPLOAD_POINTS } },
+      { new: true }
+    ).select('points');
 
-    res.status(201).json(place);
+    res.status(201).json({
+      place,
+      pointsAwarded: DINING_UPLOAD_POINTS,
+      bonusHint: `Earn ${DINING_FIRST_REVIEW_BONUS_POINTS} more points when another student reviews it first.`,
+      userPoints: updatedUser?.points || 0
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -72,12 +103,25 @@ router.post('/:id/review', protect, async (req, res) => {
     const total = place.reviews.reduce((sum, r) => sum + r.rating, 0);
     place.avgRating = parseFloat((total / place.reviews.length).toFixed(1));
 
+    let uploaderBonusAwarded = false;
+    if (!place.firstReviewRewardGranted && String(place.uploadedBy) !== String(req.user._id)) {
+      place.firstReviewRewardGranted = true;
+      uploaderBonusAwarded = true;
+      await User.findByIdAndUpdate(place.uploadedBy, {
+        $inc: { points: DINING_FIRST_REVIEW_BONUS_POINTS }
+      });
+    }
+
     await place.save();
 
     // reward reviewer
     await User.findByIdAndUpdate(req.user._id, { $inc: { points: 3 } });
 
-    res.json({ message: 'Review added', avgRating: place.avgRating });
+    res.json({
+      message: 'Review added',
+      avgRating: place.avgRating,
+      uploaderBonusAwarded
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

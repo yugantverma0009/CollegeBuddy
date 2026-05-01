@@ -25,14 +25,14 @@ npm run dev
 
 ## 4. Open browser
 ```
-http://localhost:5000
+http://localhost:5001
 ```
 
 ## 5. Deployment Notes (Production)
 - Set `MONGO_URI` and `JWT_SECRET` in backend environment variables.
 - Keep frontend and backend on same domain if possible (this project serves frontend from backend already).
 - `public/js/app.js` auto-detects API URL:
-  - local: `http://localhost:5000/api`
+  - local: `http://localhost:5001/api`
   - production: `${window.location.origin}/api`
 - Optional override: set `window.CB_API_BASE` before loading `app.js` if hosting API separately.
 - Start command for production:
@@ -47,6 +47,10 @@ npm start
 - Render health check endpoint:
 ```
 /api/health
+```
+- Full Render walkthrough:
+```
+RENDER_DEPLOY.md
 ```
 
 ---

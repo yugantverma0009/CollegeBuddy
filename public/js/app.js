@@ -4,7 +4,7 @@ const API = (() => {
   if (window.location.protocol.startsWith('http')) {
     return `${window.location.origin}/api`;
   }
-  return 'http://localhost:5000/api';
+  return 'http://localhost:5001/api';
 })();
 
 const THEME_KEY = 'cb_theme';
@@ -39,6 +39,19 @@ function saveAuth(token, user) {
   };
   localStorage.setItem('cb_token', token);
   localStorage.setItem('cb_user', JSON.stringify(normalizedUser));
+}
+
+function updateStoredUser(patch = {}) {
+  const currentUser = getUser();
+  if (!currentUser) return null;
+
+  const nextUser = {
+    ...currentUser,
+    ...patch,
+    department: normalizeDepartment(patch.department || currentUser.department)
+  };
+  localStorage.setItem('cb_user', JSON.stringify(nextUser));
+  return nextUser;
 }
 
 function logout() {
@@ -88,20 +101,115 @@ async function apiFetch(endpoint, options = {}) {
     return null;
   }
 
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data = {};
+
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch (_) {
+      data = { message: raw };
+    }
+  }
+
   if (!res.ok) {
     throw new Error(data.message || 'Something went wrong');
   }
   return data;
 }
 
-function showAlert(containerId, message, type = 'success') {
+function showAlert(containerId, message, type = 'success', options = {}) {
   const el = document.getElementById(containerId);
   if (!el) return;
+
+  const timeoutMs = typeof options === 'number' ? options : options.timeoutMs || 4000;
+  if (el._alertTimeout) clearTimeout(el._alertTimeout);
+
   el.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-  setTimeout(() => {
-    el.innerHTML = '';
-  }, 4000);
+  const alertEl = el.firstElementChild;
+
+  el._alertTimeout = setTimeout(() => {
+    if (!alertEl) {
+      el.innerHTML = '';
+      return;
+    }
+    alertEl.classList.add('is-leaving');
+    setTimeout(() => {
+      if (el.firstElementChild === alertEl) {
+        el.innerHTML = '';
+      }
+    }, 220);
+  }, timeoutMs);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function setButtonLoading(button, isLoading, defaultText, loadingText = 'Working...') {
+  if (!button) return;
+
+  if (!button.dataset.defaultText) {
+    button.dataset.defaultText = defaultText || button.textContent.trim();
+  }
+
+  button.disabled = isLoading;
+  button.classList.toggle('is-loading', isLoading);
+
+  if (isLoading) {
+    button.innerHTML = `<span class="spinner"></span>${loadingText}`;
+  } else {
+    button.textContent = defaultText || button.dataset.defaultText;
+  }
+}
+
+function createTaskOverlay({ title = 'Working...', detail = 'Please wait a moment.' } = {}) {
+  const overlay = document.createElement('div');
+  overlay.className = 'task-overlay';
+  overlay.innerHTML = `
+    <div class="task-overlay-panel">
+      <div class="task-orb"></div>
+      <p class="task-kicker">Processing</p>
+      <h3 class="task-title">${title}</h3>
+      <p class="task-detail">${detail}</p>
+      <div class="task-progress">
+        <span></span>
+      </div>
+      <div class="task-dots" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('is-visible'));
+
+  const titleEl = overlay.querySelector('.task-title');
+  const detailEl = overlay.querySelector('.task-detail');
+  const updateCopy = (nextTitle, nextDetail) => {
+    if (nextTitle) titleEl.textContent = nextTitle;
+    if (nextDetail) detailEl.textContent = nextDetail;
+  };
+
+  return {
+    update(nextTitle, nextDetail) {
+      updateCopy(nextTitle, nextDetail);
+    },
+    async succeed(nextDetail = 'Completed successfully.') {
+      overlay.classList.add('is-success');
+      updateCopy('Done', nextDetail);
+      await wait(900);
+      this.remove();
+    },
+    remove() {
+      overlay.classList.remove('is-visible');
+      setTimeout(() => {
+        overlay.remove();
+      }, 220);
+    }
+  };
 }
 
 function applyTheme(theme) {
@@ -232,6 +340,8 @@ function initSidebar() {
   const adminLinks = document.querySelectorAll('[data-role="admin"]');
   const crLinks = document.querySelectorAll('[data-role="cr"]');
   const teacherLinks = document.querySelectorAll('[data-role="teacher"]');
+  const nonStudentLinks = document.querySelectorAll('[data-role="non-student"]');
+  const hiddenByRole = document.querySelectorAll('[data-hide-role]');
 
   adminLinks.forEach((el) => {
     if (user.role !== 'admin') el.style.display = 'none';
@@ -243,6 +353,21 @@ function initSidebar() {
 
   teacherLinks.forEach((el) => {
     if (!['teacher', 'admin'].includes(user.role)) el.style.display = 'none';
+  });
+
+  nonStudentLinks.forEach((el) => {
+    if (user.role === 'student') el.style.display = 'none';
+  });
+
+  hiddenByRole.forEach((el) => {
+    const blockedRoles = (el.dataset.hideRole || '')
+      .split(/\s+/)
+      .map((role) => role.trim())
+      .filter(Boolean);
+
+    if (blockedRoles.includes(user.role)) {
+      el.style.display = 'none';
+    }
   });
 
   const toggle = document.getElementById('menu-toggle');

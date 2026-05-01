@@ -11,6 +11,24 @@ const {
   normalizeDepartmentField
 } = require('../utils/department');
 
+const NOTE_UPLOAD_POINTS = 2;
+const NOTE_FIRST_ACCESS_BONUS_POINTS = 3;
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function awardFirstAccessBonus(note, accessorId) {
+  if (note.firstAccessRewardGranted) return false;
+  if (String(note.uploadedBy) === String(accessorId)) return false;
+
+  note.firstAccessRewardGranted = true;
+  await User.findByIdAndUpdate(note.uploadedBy, {
+    $inc: { points: NOTE_FIRST_ACCESS_BONUS_POINTS }
+  });
+  return true;
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../../public/uploads')),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s/g, '_'))
@@ -49,23 +67,56 @@ router.get('/', protect, async (req, res) => {
 // Upload a note
 router.post('/', protect, upload.single('file'), async (req, res) => {
   try {
-    const { title, subject, description, department, year, price } = req.body;
+    const title = String(req.body.title || '').trim();
+    const subject = String(req.body.subject || '').trim();
+    const description = String(req.body.description || '').trim();
+    const department = normalizeDepartment(req.body.department || req.user.department);
+    const year = req.body.year || req.user.year;
+    const price = Number(req.body.price || 0);
     const fileUrl = req.file ? '/uploads/' + req.file.filename : '';
+
+    if (!title || !subject) {
+      return res.status(400).json({ message: 'Title and subject are required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please attach a file before uploading a note' });
+    }
+
+    const duplicateNote = await Note.findOne({
+      uploadedBy: req.user._id,
+      department,
+      year,
+      title: { $regex: `^${escapeRegex(title)}$`, $options: 'i' },
+      subject: { $regex: `^${escapeRegex(subject)}$`, $options: 'i' }
+    });
+
+    if (duplicateNote) {
+      return res.status(409).json({ message: 'You already uploaded the same note for this class' });
+    }
 
     const note = await Note.create({
       title, subject, description,
       fileUrl,
       uploadedBy: req.user._id,
-      department: normalizeDepartment(department || req.user.department),
-      year: year || req.user.year,
-      price: price || 0
+      department,
+      year,
+      price: Number.isFinite(price) && price > 0 ? price : 0
     });
     normalizeDepartmentField(note);
 
-    // give uploader some points
-    await User.findByIdAndUpdate(req.user._id, { $inc: { points: 5 } });
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { points: NOTE_UPLOAD_POINTS } },
+      { new: true }
+    ).select('points');
 
-    res.status(201).json(note);
+    res.status(201).json({
+      note,
+      pointsAwarded: NOTE_UPLOAD_POINTS,
+      bonusHint: `Earn ${NOTE_FIRST_ACCESS_BONUS_POINTS} more points when another student unlocks it for the first time.`,
+      userPoints: updatedUser?.points || 0
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -105,12 +156,23 @@ router.post('/:id/buy', protect, async (req, res) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ message: 'Note not found' });
+    const alreadyBought = note.buyers.some((buyerId) => String(buyerId) === String(req.user._id));
+    let uploaderBonusAwarded = false;
 
     // Already bought or free
-    if (note.buyers.includes(req.user._id) || note.price === 0) {
+    if (alreadyBought || note.price === 0) {
+      if (!alreadyBought && String(note.uploadedBy) !== String(req.user._id)) {
+        note.buyers.push(req.user._id);
+      }
       note.downloads += 1;
+      uploaderBonusAwarded = await awardFirstAccessBonus(note, req.user._id);
       await note.save();
-      return res.json({ message: 'Access granted', fileUrl: note.fileUrl });
+      return res.json({
+        message: 'Access granted',
+        fileUrl: note.fileUrl,
+        uploaderBonusAwarded,
+        buyerPoints: null
+      });
     }
 
     const buyer = await User.findById(req.user._id);
@@ -119,14 +181,24 @@ router.post('/:id/buy', protect, async (req, res) => {
     }
 
     // deduct from buyer, give to uploader
-    await User.findByIdAndUpdate(req.user._id, { $inc: { points: -note.price } });
+    const updatedBuyer = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { points: -note.price } },
+      { new: true }
+    ).select('points');
     await User.findByIdAndUpdate(note.uploadedBy, { $inc: { points: note.price } });
 
     note.buyers.push(req.user._id);
     note.downloads += 1;
+    uploaderBonusAwarded = await awardFirstAccessBonus(note, req.user._id);
     await note.save();
 
-    res.json({ message: 'Purchase successful', fileUrl: note.fileUrl });
+    res.json({
+      message: 'Purchase successful',
+      fileUrl: note.fileUrl,
+      uploaderBonusAwarded,
+      buyerPoints: updatedBuyer?.points || 0
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
