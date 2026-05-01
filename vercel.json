@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://collegebuddy-backend.onrender.com/api/:path*"
+      "destination": "https://collegebuddy-backend-c8tj.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://collegebuddy-backend.onrender.com/uploads/:path*"
+      "destination": "https://collegebuddy-backend-c8tj.onrender.com/uploads/:path*"
     }
   ],
   "routes": [
