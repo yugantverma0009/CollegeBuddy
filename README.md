@@ -6,14 +6,6 @@ A student companion web application designed to help college students manage the
 
 CollegeBuddy is a comprehensive platform that streamlines academic management, social coordination, and college life logistics for students. Whether you need to organize your schedule, connect with peers, or manage academic resources, CollegeBuddy has you covered.
 
-## Features
-
-- 📚 **Academic Management** - Track assignments, deadlines, and grades
-- 👥 **Social Networking** - Connect with classmates and build study groups
-- 📅 **Schedule Coordination** - Manage your timetable and events
-- 🔔 **Notifications** - Stay updated with important reminders
-- 💬 **Messaging** - Direct communication with peers
-- 📊 **Analytics** - Track your academic progress
 
 ## Tech Stack
 
