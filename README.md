@@ -1,11 +1,20 @@
 # CollegeBuddy 🎓
 
-A student companion web application designed to help college students manage their academic and social needs.
+College Buddy is a full-stack web application designed to simplify day-to-day campus activities by bringing academic and utility services into a single platform. It provides separate access and functionality for students, class representatives, teachers, and administrators.
 
-## Overview
+## Features
 
-CollegeBuddy is a comprehensive platform that streamlines academic management, social coordination, and college life logistics for students. Whether you need to organize your schedule, connect with peers, or manage academic resources, CollegeBuddy has you covered.
-
+- Secure authentication with JWT and role-based access control
+- Notes sharing and management system
+- Subject-wise attendance tracking with 75% calculator
+- Timetable management with support for extra and cancelled classes
+- Weekly mess menu
+- Lost and found portal
+- Dining places with ratings and reviews
+- Poll system for class coordination
+- Teacher portal for attendance and timetable updates
+- Admin panel for managing users
+- Points-based contribution system
 
 ## Tech Stack
 
@@ -15,8 +24,12 @@ CollegeBuddy is a comprehensive platform that streamlines academic management, s
 - **CSS** (15.7%)
 
 ### Backend
-- Node.js / Express (or your specific backend framework)
-- Database: [Specify your database - MongoDB, PostgreSQL, etc.]
+- **Node.js**
+- **Express.js**
+
+**Database**
+- **MongoDB**
+- **Mongoose**
 
 ## Project Structure
 
@@ -406,24 +419,26 @@ For issues or questions:
 
 ---
 
-## 🎯 Deployment Checklist
 
-- [ ] Frontend code pushed to GitHub
-- [ ] Backend code pushed to GitHub
-- [ ] Environment variables configured in Vercel
-- [ ] Environment variables configured in Render
-- [ ] Database created and connected (if applicable)
-- [ ] Frontend deployed to Vercel
-- [ ] Backend deployed to Render
-- [ ] Frontend and backend communicate successfully
-- [ ] All endpoints tested in production
-- [ ] Monitoring and logging enabled
+
+## Tested Functionalities
+
+- User registration and login
+- Protected routes
+- Notes upload and retrieval
+- Attendance calculations
+- Poll threshold logic
+- Lost and found system
+- Dining reviews and ratings
+
+## Future Improvements
+
+- Real-time notifications
+- Email and WhatsApp integration
+- Mobile application support
+- Profile picture upload
+- Analytics dashboard
 
 ---
 
-**Last Updated**: June 9, 2026
-**Deployment Status**: ✅ Ready for Production
-
----
-
-*CollegeBuddy - Making college easier, one feature at a time! 🎓*
+*CollegeBuddy - Making college easier
